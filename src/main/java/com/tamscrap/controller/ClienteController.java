@@ -1,24 +1,28 @@
+ 
 package com.tamscrap.controller;
 
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
-import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tamscrap.model.Cliente;
+import com.tamscrap.model.UserAuthority;
 import com.tamscrap.service.impl.ClienteServiceImpl;
 
 @RestController
-@RequestMapping("/clientes")
+@RequestMapping("/clientes/api")
+@CrossOrigin(origins = "http://localhost:3000/")
 public class ClienteController {
 
 	private final ClienteServiceImpl clienteService;
@@ -28,73 +32,45 @@ public class ClienteController {
 		this.clienteService = clienteService;
 	}
 
-	@PostMapping("api/clientes")
-	public Cliente guardarClientes(@RequestBody Cliente cliente) {
+	@PostMapping("/addCliente")
+	public Cliente guardarCliente(@RequestBody Cliente cliente) {
+ 		
 		logger.log(Level.INFO, "Cliente recibido: {0}", cliente);
 		clienteService.insertarCliente(cliente);
 		return cliente;
 	}
 
-	@GetMapping(value = { "", "/" })
-	String clientes(Model model) {
-		List<Cliente> lista = clienteService.obtenerTodos();
-		model.addAttribute("clientes", lista);
-		model.addAttribute("nuevoCliente", new Cliente());
-		model.addAttribute("clienteaEditar", new Cliente());
-		model.addAttribute("nombreNuevo", "");
-		return "clientes/listarClientes";
+	@GetMapping("/clientes")
+	public List<Cliente> obtenerTodosLosClientes() {
+		logger.log(Level.INFO, "Obteniendo todos los clientes");
+		return clienteService.obtenerTodos();
 	}
 
-	@GetMapping("/add")
-	public String crearCliente(Model model) {
-		Cliente cliente = new Cliente();
-		model.addAttribute("nuevoCliente", cliente);
-		return "clientes/crearCliente";
+	@GetMapping("/ver/{id}")
+	public Cliente obtenerClientePorId(@PathVariable Long id) {
+		logger.log(Level.INFO, "Obteniendo cliente con ID: {0}", id);
+		return clienteService.obtenerPorId(id);
 	}
 
-	@PostMapping("/add")
-	public String addCliente(@ModelAttribute("nuevoCliente") Cliente cliente, BindingResult bindingResult) {
-		clienteService.insertarCliente(cliente);
-		Logger logger = Logger.getGlobal();
-		logger.log(Level.INFO, "Insertar cliente nuevo: " + cliente.getUsername());
-
-		return "redirect:/clientes";
-
+	@PutMapping("/editar/{id}")
+	public Cliente editarCliente(@PathVariable Long id, @RequestBody Cliente cliente) {
+	    Cliente clienteExistente = clienteService.obtenerPorId(id);
+	    
+	    clienteExistente.setUsername(cliente.getUsername());
+	    clienteExistente.setEmail(cliente.getEmail());
+	    List<UserAuthority> authorities = cliente.getAuthorities().stream()
+	        .map(authority -> UserAuthority.valueOf(authority.getAuthority()))
+	        .collect(Collectors.toList());
+	    clienteExistente.setAuthorities(authorities);
+	    clienteService.insertarCliente(clienteExistente);
+	    return clienteExistente;
 	}
 
-	@GetMapping("/edit/{id}")
-	public String mostrarFormularioEdicionCliente(@PathVariable Long id, Model model) {
 
-		Cliente cliente = clienteService.obtenerPorId(id);
-
-		model.addAttribute("clienteEditar", cliente);
-
-		return "clientes/editarClientes";
-	}
-
-	@PostMapping("/edit/{id}")
-	public String editarCliente(@PathVariable Long id, @ModelAttribute("clienteEditar") Cliente cliente,
-			BindingResult bindingResult) {
-
-		Cliente clienteExistente = clienteService.obtenerPorId(id);
-
-		clienteExistente.setUsername(cliente.getUsername());
-		clienteService.insertarCliente(clienteExistente);
-		return "redirect:/clientes";
-	}
-
-	@GetMapping({ "/delete/{id}" })
+	@DeleteMapping("/borrar/{id}")
 	public String eliminarCliente(@PathVariable Long id) {
-
 		clienteService.eliminarCliente(id);
-
-		return "redirect:/clientes";
-	}
-
-	@GetMapping("/{id}")
-	public String mostrarCliente(@PathVariable Long id, Model model) {
-		Cliente cliente = clienteService.obtenerPorId(id);
-		model.addAttribute("cliente", cliente);
-		return "clientes/cliente";
+		logger.log(Level.INFO, "Cliente con ID {0} eliminado", id);
+		return "Cliente eliminado con éxito";
 	}
 }

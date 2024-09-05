@@ -1,24 +1,29 @@
+
 package com.tamscrap.controller;
 
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tamscrap.model.Producto;
+import com.tamscrap.model.ProductosPedidos;
 import com.tamscrap.service.impl.ProductoServiceImpl;
 
 @RestController
-@RequestMapping("/productos")
+@RequestMapping("/productos/api")
+@CrossOrigin(origins = "http://localhost:3000/")
 public class ProductoController {
 
 	private final ProductoServiceImpl productoService;
@@ -28,77 +33,65 @@ public class ProductoController {
 		this.productoService = productoService;
 	}
 
-	@PostMapping("/api/productos")
+	@PostMapping("/addProducto")
 	public Producto guardarProducto(@RequestBody Producto producto) {
+
 		logger.log(Level.INFO, "Producto recibido: {0}", producto);
 		productoService.insertarProducto(producto);
 		return producto;
 	}
 
-	@GetMapping({ "", "/" })
-	public String listarProductos(Model model) {
-		List<Producto> productos = productoService.obtenerTodos();
-		model.addAttribute("productos", productos);
-		model.addAttribute("productoNuevo", new Producto());
-		return "productos/listarProductos";
+	@GetMapping("/productos")
+	public List<Producto> obtenerTodosLosProductos() {
+		logger.log(Level.INFO, "Obteniendo todos los productos");
+		return productoService.obtenerTodos();
 	}
 
-	@GetMapping("/add")
-	public String mostrarFormularioDeNuevoProducto(Model model) {
-		model.addAttribute("productoNuevo", new Producto());
-		return "productos/crearProducto";
+	@GetMapping("/ver/{id}")
+	public Producto obtenerProductoPorId(@PathVariable Long id) {
+		logger.log(Level.INFO, "Obteniendo producto con ID: {0}", id);
+		return productoService.obtenerPorId(id);
 	}
 
-	@PostMapping("/add")
-	public String addProducto(@ModelAttribute("productoNuevo") Producto producto, BindingResult bindingResult) {
-		productoService.insertarProducto(producto);
-		return "redirect:/productos";
-	}
-
-	@GetMapping("/edit/{id}")
-	public String mostrarFormularioDeEdicionDeProducto(@PathVariable Long id, Model model) {
-		Producto producto = productoService.obtenerPorId(id);
-		model.addAttribute("productoEditar", producto);
-		return "productos/editarProducto";
-	}
-
-	@PostMapping("/edit/{id}")
-	public String editarProducto(@PathVariable Long id, @ModelAttribute("productoEditar") Producto producto,
-			BindingResult bindingResult) {
+	@PutMapping("/editar/{id}")
+	public ResponseEntity<Producto> editarProducto(@PathVariable Long id, @RequestBody Producto producto) {
 		Producto productoExistente = productoService.obtenerPorId(id);
 
-		// Actualiza los detalles del producto existente
+		if (productoExistente == null) {
+			return ResponseEntity.notFound().build();
+		}
+
 		productoExistente.setNombre(producto.getNombre());
 		productoExistente.setPrecio(producto.getPrecio());
+		productoExistente.setImagen(producto.getImagen());
+		productoExistente.setLettering(producto.isLettering());
+		productoExistente.setScrapbooking(producto.isScrapbooking());
+
+		Set<ProductosPedidos> pedidosExistentes = productoExistente.getPedidos();
+		Set<ProductosPedidos> nuevosPedidos = producto.getPedidos();
+
+		if (nuevosPedidos != null) {
+
+			for (ProductosPedidos pedido : pedidosExistentes) {
+				pedido.setProducto(null);
+			}
+
+			for (ProductosPedidos nuevoPedido : nuevosPedidos) {
+				if (nuevoPedido.getPedido() != null) {
+					nuevoPedido.setProducto(productoExistente); // Establece la relación
+					productoExistente.getPedidos().add(nuevoPedido);
+				}
+			}
+		}
 
 		productoService.insertarProducto(productoExistente);
-		return "redirect:/productos";
+		return ResponseEntity.ok(productoExistente);
 	}
 
-	@GetMapping("/delete/{id}")
+	@DeleteMapping("/borrar/{id}")
 	public String eliminarProducto(@PathVariable Long id) {
 		productoService.eliminarProducto(id);
-		return "redirect:/productos";
-	}
-
-	@GetMapping("/{id}")
-	public String mostrarProducto(@PathVariable Long id, Model model) {
-		Producto producto = productoService.obtenerPorId(id);
-		model.addAttribute("producto", producto);
-		return "productos/producto";
-	}
-
-	@GetMapping("/scrapbooking")
-	public String listarProductosScrapbooking(Model model) {
-		List<Producto> productoScrapbooking = productoService.ObtenerProductosScrapbooking();
-		model.addAttribute("producto", productoScrapbooking);
-		return "producto/listarProductosScrapbooking";
-	}
-
-	@GetMapping("/lettering")
-	public String listarProductosLettering(Model model) {
-		List<Producto> productosLettering = productoService.ObtenerProductosLettering();
-		model.addAttribute("productos", productosLettering);
-		return "productos/listarProductosLettering";
+		logger.log(Level.INFO, "Producto con ID {0} eliminado", id);
+		return "Producto eliminado con éxito";
 	}
 }
