@@ -6,8 +6,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
+ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,13 +53,10 @@ public class ProductoController {
 	}
 
 	@PutMapping("/editar/{id}")
-	public ResponseEntity<Producto> editarProducto(@PathVariable Long id, @RequestBody Producto producto) {
+	public List<Producto> editarProducto(@PathVariable Long id, @RequestBody Producto producto) {
 		Producto productoExistente = productoService.obtenerPorId(id);
 
-		if (productoExistente == null) {
-			return ResponseEntity.notFound().build();
-		}
-
+		 
 		productoExistente.setNombre(producto.getNombre());
 		productoExistente.setPrecio(producto.getPrecio());
 		productoExistente.setImagen(producto.getImagen());
@@ -78,14 +74,14 @@ public class ProductoController {
 
 			for (ProductosPedidos nuevoPedido : nuevosPedidos) {
 				if (nuevoPedido.getPedido() != null) {
-					nuevoPedido.setProducto(productoExistente); // Establece la relación
+					nuevoPedido.setProducto(productoExistente);  
 					productoExistente.getPedidos().add(nuevoPedido);
 				}
 			}
 		}
 
-		productoService.insertarProducto(productoExistente);
-		return ResponseEntity.ok(productoExistente);
+		return	(List<Producto>) productoService.insertarProducto(productoExistente);
+		   
 	}
 
 	@DeleteMapping("/borrar/{id}")
@@ -94,4 +90,19 @@ public class ProductoController {
 		logger.log(Level.INFO, "Producto con ID {0} eliminado", id);
 		return "Producto eliminado con éxito";
 	}
+
+	@GetMapping("/lettering")
+	public List<Producto>obtenerProductosLettering() {
+		return productoService.ObtenerProductosLettering();
+ 	}
+
+	@GetMapping("/scrapbooking")
+	public List<Producto> obtenerProductosScrapbooking() {
+		return productoService.ObtenerProductosScrapbooking();
+ 	}
+
+	@GetMapping("/ofertas")
+	public List<Producto>obtenerProductosOferta() {
+		return productoService.ObtenerProductosOferta();
+ 	}
 }

@@ -72,4 +72,8 @@ public class ProductoServiceImpl implements ProductoService {
 	public List<Producto> ObtenerProductosScrapbooking() {
 		return productoRepo.findByScrapbooking(true);
 	}
+
+	public List<Producto> ObtenerProductosOferta() {
+		return productoRepo.findByOferta(true);
+	}
 }

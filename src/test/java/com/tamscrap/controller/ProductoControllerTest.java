@@ -71,7 +71,7 @@ public class ProductoControllerTest {
 		            .with(csrf())
 		    );
 
-		    // Verificación de la respuesta y comparación con el objeto Producto
+
 		    resultActions
 		        .andExpect(status().isOk())
 		        .andExpect(result -> {
@@ -79,7 +79,6 @@ public class ProductoControllerTest {
 		            assertThat(productoResponse).usingRecursiveComparison().isEqualTo(producto);
 		        });
 
-		    // Verificación de que se insertó el producto
 		    verify(productoService).insertarProducto(producto);
 	}
 

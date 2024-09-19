@@ -2,29 +2,34 @@ package com.tamscrap.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
+@EnableWebSecurity
 public class SecurityConfig {
-
 	@Bean
-	public PasswordEncoder passwordEncoder() {
+	public BCryptPasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder();
 	}
 
-	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    @Bean
+    protected SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
+        httpSecurity
+                .authorizeHttpRequests(requests -> requests
+                        .requestMatchers("/", "/login", "/logout", "/index.html", "/entreFechas.html").permitAll()
+                        .requestMatchers("/formularioVenta.html").permitAll()
+                        .requestMatchers("/conciertos.html", "/formularioComprador.html", "/formularioConcierto.html",
+                                "/formularioSala.html", "/salas.html", "/ventas.html").permitAll()
+                        .anyRequest().permitAll())
+                .exceptionHandling(handling -> handling.accessDeniedPage("/403"))
+                .formLogin(form -> form.loginPage("/login").failureUrl("/login?error=true")
+                        .usernameParameter("username")
+                        .passwordParameter("password"));
 
-		http.authorizeHttpRequests(requests -> requests.requestMatchers("/css/**").permitAll().requestMatchers("/js/**")
-				.permitAll().requestMatchers("/files/**").permitAll().requestMatchers("/webjars/**").permitAll()
-				.requestMatchers(HttpMethod.GET, "/productos/**").permitAll().anyRequest().authenticated()).formLogin()
-				.defaultSuccessUrl("/productos", true).and().logout().logoutSuccessUrl("/productos");
-
-		return http.build();
-	}
-
+        return httpSecurity.build();
+    }
 }
+ 

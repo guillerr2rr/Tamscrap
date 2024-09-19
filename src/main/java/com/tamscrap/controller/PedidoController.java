@@ -5,10 +5,8 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,185 +23,114 @@ import com.tamscrap.service.impl.PedidoServiceImpl;
 import com.tamscrap.service.impl.ProductoServiceImpl;
 
 @RestController
-@RequestMapping("/pedidos")
+@RequestMapping("/pedidos/api")
+@CrossOrigin(origins = "http://localhost:3000")
 public class PedidoController {
 
-	private final ProductoServiceImpl productoService;
+    private final ProductoServiceImpl productoService;
+    private final PedidoServiceImpl pedidoService;
+    private final ClienteServiceImpl clienteService;
+    private static final Logger logger = Logger.getLogger(PedidoController.class.getName());
 
-	private final PedidoServiceImpl pedidoService;
+    public PedidoController(ProductoServiceImpl productoService, PedidoServiceImpl pedidoService, ClienteServiceImpl clienteService) {
+        this.productoService = productoService;
+        this.pedidoService = pedidoService;
+        this.clienteService = clienteService;
+    }
 
-	private final ClienteServiceImpl clienteService;
-	private static final Logger logger = Logger.getLogger(PedidoController.class.getName());
+    @PostMapping("/pedidos")
+    public Pedido guardarPedido(@RequestBody Pedido pedido) {
+        logger.log(Level.INFO, "Pedido recibido: {0}", pedido);
+        pedidoService.insertarPedido(pedido);
+        return pedido;
+    }
 
-	public PedidoController(ProductoServiceImpl productoService, PedidoServiceImpl pedidoService,
-			ClienteServiceImpl clienteService) {
-		this.productoService = productoService;
-		this.pedidoService = pedidoService;
-		this.clienteService = clienteService;
-	}
+    @GetMapping
+    public List<Pedido> mostrarPedidos() {
+        return pedidoService.obtenerTodos();
+    }
 
-	@PostMapping("/api/pedidos")
-	public Pedido guardarPedido(@RequestBody Pedido pedido) {
-		logger.log(Level.INFO, "Pedido recibido: {0}", pedido);
-		pedidoService.insertarPedido(pedido);
-		return pedido;
-	}
+    @PostMapping("/add")
+    public Pedido agregarPedido(@RequestBody Pedido pedido, @RequestBody List<Long> productoIds) {
+        if (productoIds != null) {
+            for (Long productoId : productoIds) {
+                Producto producto = productoService.obtenerPorId(productoId);
+                pedido.addProducto(producto, 1);
+            }
+        }
+        pedido.calcularPrecio();
+        pedidoService.insertarPedido(pedido);
+        return pedido;
+    }
 
-	@GetMapping(value = { "", "/" })
-	public String mostrarPedidos(Model model) {
-		List<Producto> productos = productoService.obtenerTodos();
-		List<Cliente> clientes = clienteService.obtenerTodos();
-		List<Pedido> lista = pedidoService.obtenerTodos();
+    @GetMapping("/edit/{id}")
+    public Pedido editarPedido(@PathVariable Long id) {
+        return pedidoService.obtenerPorId(id);
+    }
 
-		model.addAttribute("listaproductos", productos);
-		model.addAttribute("clientes", clientes);
-		model.addAttribute("pedidos", lista);
-		model.addAttribute("pedidoNuevo", new Pedido());
-		model.addAttribute("pedidoMostrar", new Pedido());
-		model.addAttribute("nombreNuevo", "");
-		return "pedidos/listarPedidos";
-	}
+    @PostMapping("/edit/{id}")
+    public Pedido actualizarPedido(@PathVariable Long id, @RequestBody Pedido pedido, @RequestBody List<Integer> cantidades) {
+        Pedido pedidoExistente = pedidoService.obtenerPorId(id);
+        Cliente cliente = clienteService.obtenerPorId(pedido.getCliente().getId());
+        pedidoExistente.setCliente(cliente);
 
-	@GetMapping("/add")
-	public String crearPedido(Model model) {
-		List<Producto> productos = productoService.obtenerTodos();
-		List<Cliente> clientes = clienteService.obtenerTodos();
+        Set<ProductosPedidos> productosPedidos = pedidoExistente.getProductos();
+        ProductosPedidos[] productosArray = productosPedidos.toArray(new ProductosPedidos[0]);
 
-		Pedido pedido = new Pedido();
-		model.addAttribute("listaproductos", productos);
-		model.addAttribute("clientes", clientes);
-		model.addAttribute("pedidoNuevo", pedido);
-		return "pedidos/crearPedido";
-	}
+        for (int i = 0; i < Math.min(productosArray.length, cantidades.size()); i++) {
+            ProductosPedidos productoPedido = productosArray[i];
+            if (cantidades.get(i) > 0) {
+                productoPedido.setCantidad(cantidades.get(i));
+            } else {
+                pedidoExistente.removeProducto(productoPedido.getProducto());
+            }
+        }
+        pedidoService.insertarPedido(pedidoExistente);
 
-	@PostMapping("/add")
-	public String agregarPedido(@ModelAttribute("pedidoNuevo") Pedido pedido, BindingResult bindingResult,
-			@RequestParam("productos") String[] productoIds) {
-		if (productoIds != null) {
-			for (String productoId : productoIds) {
-				Producto producto = productoService.obtenerPorId(Long.parseLong(productoId));
-				pedido.addProducto(producto, 1);
-			}
-		}
-		pedido.calcularPrecio();
+        return pedidoExistente;
+    }
 
-		pedidoService.insertarPedido(pedido);
+    @PostMapping("/addProducto/{id}")
+    public Pedido agregarProducto(@PathVariable Long id, @RequestBody Long idProducto, @RequestParam("cantidad") int cantidad) {
+        Pedido pedidoExistente = pedidoService.obtenerPorId(id);
+        Producto producto = productoService.obtenerPorId(idProducto);
 
-		return "redirect:/pedidos";
-	}
+        ProductosPedidos productoPedidoExistente = null;
+        for (ProductosPedidos bp : pedidoExistente.getProductos()) {
+            if (bp.getProducto().getId().equals(idProducto)) {
+                productoPedidoExistente = bp;
+                break;
+            }
+        }
 
-	@GetMapping(value = { "/edit/{id}", "{id}" })
-	public String editarPedido(@PathVariable Long id, Model model) {
+        int nuevaCantidad = cantidad;
 
-		Pedido pedido = pedidoService.obtenerPorId(id);
-		List<Cliente> clientes = clienteService.obtenerTodos();
-		List<Producto> listaproductos = productoService.obtenerTodos();
-		ProductosPedidos productosPedidosNew = new ProductosPedidos(new Producto(), new Pedido(), 1);
+        if (productoPedidoExistente != null) {
+            nuevaCantidad += productoPedidoExistente.getCantidad();
+            productoPedidoExistente.setCantidad(nuevaCantidad);
+            pedidoExistente.addProducto(producto, nuevaCantidad);
+        } else {
+            pedidoExistente.addProducto2(producto, nuevaCantidad);
+        }
 
-		model.addAttribute("pedidoMostrar", pedido);
-		model.addAttribute("clientes", clientes);
-		model.addAttribute("listaproductos", listaproductos);
-		model.addAttribute("pedidoNuevo", productosPedidosNew);
+        pedidoExistente.calcularPrecio();
+        pedidoService.insertarPedido(pedidoExistente);
+        return pedidoExistente;
+    }
 
-		return "pedidos/editarPedido";
-	}
+    @GetMapping("/removeProducto/{pedidoId}/{productoId}")
+    public Pedido removeProducto(@PathVariable Long pedidoId, @PathVariable Long productoId) {
+        Pedido pedido = pedidoService.obtenerPorId(pedidoId);
+        Producto producto = productoService.obtenerPorId(productoId);
 
-	@PostMapping("/edit/{id}")
-	public String actualizarPedido(@PathVariable Long id, @ModelAttribute Pedido pedido,
-			@RequestParam("cantidad") Integer[] cantidades, Model model, BindingResult bindingResult) {
+        pedido.removeProducto(producto);
+        pedidoService.insertarPedido(pedido);
+        return pedido;
+    }
 
-		Pedido pedidoExistente = pedidoService.obtenerPorId(id);
-		Cliente cliente = clienteService.obtenerPorId(pedido.getCliente().getId());
-		pedidoExistente.setCliente(cliente);
-
-		Set<ProductosPedidos> productosPedidos = pedidoExistente.getProductos();
-		ProductosPedidos[] productosArray = productosPedidos.toArray(new ProductosPedidos[0]);
-
-		// Actualizar las cantidades y eliminar los ProductosPedidos con cantidad <= 0
-		for (int i = 0; i < Math.min(productosArray.length, cantidades.length); i++) {
-			ProductosPedidos productoPedido = productosArray[i];
-			if (cantidades[i] > 0) {
-				productoPedido.setCantidad(cantidades[i]);
-			} else {
-				pedidoExistente.removeProducto(productoPedido.getProducto());
-			}
-		}
-		pedidoService.insertarPedido(pedidoExistente);
-
-		model.addAttribute("clientes", clienteService.obtenerTodos());
-		model.addAttribute("listaproductos", productoService.obtenerTodos());
-		model.addAttribute("pedidos", pedidoService.obtenerTodos());
-		model.addAttribute("pedidoNuevo", new Pedido());
-
-		return "redirect:/pedidos";
-	}
-
-	@PostMapping("/addProducto/{id}")
-	public String agregarProducto(@PathVariable Long id, @RequestParam("producto.id") Long idProducto,
-			@RequestParam("cantidad") int cantidad) {
-
-		Pedido pedidoExistente = pedidoService.obtenerPorId(id);
-		Producto producto = productoService.obtenerPorId(idProducto);
-
-		ProductosPedidos productoPedidoExistente = null;
-		for (ProductosPedidos bp : pedidoExistente.getProductos()) {
-			if (bp.getProducto().getId().equals(idProducto)) {
-				productoPedidoExistente = bp;
-				break;
-			}
-		}
-
-		int nuevaCantidad = cantidad;
-
-		if (productoPedidoExistente != null) {
-			nuevaCantidad += productoPedidoExistente.getCantidad();
-			productoPedidoExistente.setCantidad(nuevaCantidad);
-			pedidoExistente.addProducto(producto, nuevaCantidad);
-		} else {
-
-			pedidoExistente.addProducto2(producto, nuevaCantidad);
-
-		}
-
-		pedidoExistente.calcularPrecio();
-		pedidoService.insertarPedido(pedidoExistente);
-		return "redirect:/pedidos";
-		// return "redirect:/pedidos/edit/" + id;
-	}
-
-	@GetMapping("/removeProducto/{pedidoId}/{productoId}")
-	public String removeProducto(@PathVariable Long pedidoId, @PathVariable Long productoId, Model model) {
-		Pedido pedido = pedidoService.obtenerPorId(pedidoId);
-		Producto producto = productoService.obtenerPorId(productoId);
-
-		pedido.removeProducto(producto);
-		pedidoService.insertarPedido(pedido);
-		return "redirect:/pedidos";
-	}
-//
-//	@GetMapping("/{id}")
-//	public String mostrarPedido(@PathVariable Long id, Model model) {
-//		Pedido pedido = pedidoService.obtenerPorId(id);
-//		Set<ProductosPedidos> listaProductos = pedido.getProductos();
-//		Cliente cliente = pedido.getCliente();
-//
-//		model.addAttribute("pedidoMostrar", pedido);
-//		model.addAttribute("clientes", cliente);
-//		model.addAttribute("listaproductosPedidos", listaProductos);
-//
-//		List<Producto> productos = productoService.obtenerTodos();
-//		model.addAttribute("listaproductos", productos);
-//
-//		ProductosPedidos productosPedidosNew = new ProductosPedidos(new Producto(), new Pedido(), 1);
-//		model.addAttribute("pedidoNuevo", productosPedidosNew);
-//
-//		return "pedidos/pedido";
-//	}
-
-	@GetMapping("/delete/{id}")
-	public String eliminarPedido(@PathVariable Long id) {
-		pedidoService.eliminarPedido(id);
-		return "redirect:/pedidos";
-	}
-
+    @GetMapping("/delete/{id}")
+    public String eliminarPedido(@PathVariable Long id) {
+        pedidoService.eliminarPedido(id);
+        return "Pedido eliminado con éxito";
+    }
 }

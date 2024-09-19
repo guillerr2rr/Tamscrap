@@ -31,6 +31,11 @@ public class ClienteController {
 	public ClienteController(ClienteServiceImpl clienteService) {
 		this.clienteService = clienteService;
 	}
+//	@RequestMapping("/login")
+//	public String login() {
+//		return "login";
+//	}
+
 
 	@PostMapping("/addCliente")
 	public Cliente guardarCliente(@RequestBody Cliente cliente) {
