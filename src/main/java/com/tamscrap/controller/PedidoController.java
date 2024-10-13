@@ -5,6 +5,8 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,39 +41,53 @@ public class PedidoController {
     }
 
     @PostMapping("/pedidos")
-    public Pedido guardarPedido(@RequestBody Pedido pedido) {
+    public ResponseEntity<Pedido> guardarPedido(@RequestBody Pedido pedido) {
         logger.log(Level.INFO, "Pedido recibido: {0}", pedido);
-        pedidoService.insertarPedido(pedido);
-        return pedido;
+        Pedido savedPedido = pedidoService.insertarPedido(pedido);
+        return new ResponseEntity<>(savedPedido, HttpStatus.CREATED);
     }
 
     @GetMapping
-    public List<Pedido> mostrarPedidos() {
-        return pedidoService.obtenerTodos();
+    public ResponseEntity<List<Pedido>> mostrarPedidos() {
+        List<Pedido> pedidos = pedidoService.obtenerTodos();
+        return new ResponseEntity<>(pedidos, HttpStatus.OK);
     }
 
     @PostMapping("/add")
-    public Pedido agregarPedido(@RequestBody Pedido pedido, @RequestBody List<Long> productoIds) {
+    public ResponseEntity<Pedido> agregarPedido(@RequestBody Pedido pedido, @RequestBody List<Long> productoIds) {
         if (productoIds != null) {
             for (Long productoId : productoIds) {
                 Producto producto = productoService.obtenerPorId(productoId);
+                if (producto == null) {
+                    return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+                }
                 pedido.addProducto(producto, 1);
             }
         }
         pedido.calcularPrecio();
-        pedidoService.insertarPedido(pedido);
-        return pedido;
+        Pedido savedPedido = pedidoService.insertarPedido(pedido);
+        return new ResponseEntity<>(savedPedido, HttpStatus.CREATED);
     }
 
     @GetMapping("/edit/{id}")
-    public Pedido editarPedido(@PathVariable Long id) {
-        return pedidoService.obtenerPorId(id);
+    public ResponseEntity<Pedido> editarPedido(@PathVariable Long id) {
+        Pedido pedido = pedidoService.obtenerPorId(id);
+        if (pedido == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<>(pedido, HttpStatus.OK);
     }
 
     @PostMapping("/edit/{id}")
-    public Pedido actualizarPedido(@PathVariable Long id, @RequestBody Pedido pedido, @RequestBody List<Integer> cantidades) {
+    public ResponseEntity<Pedido> actualizarPedido(@PathVariable Long id, @RequestBody Pedido pedido, @RequestBody List<Integer> cantidades) {
         Pedido pedidoExistente = pedidoService.obtenerPorId(id);
+        if (pedidoExistente == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
         Cliente cliente = clienteService.obtenerPorId(pedido.getCliente().getId());
+        if (cliente == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
         pedidoExistente.setCliente(cliente);
 
         Set<ProductosPedidos> productosPedidos = pedidoExistente.getProductos();
@@ -85,15 +101,20 @@ public class PedidoController {
                 pedidoExistente.removeProducto(productoPedido.getProducto());
             }
         }
-        pedidoService.insertarPedido(pedidoExistente);
-
-        return pedidoExistente;
+        Pedido updatedPedido = pedidoService.insertarPedido(pedidoExistente);
+        return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
     }
 
     @PostMapping("/addProducto/{id}")
-    public Pedido agregarProducto(@PathVariable Long id, @RequestBody Long idProducto, @RequestParam("cantidad") int cantidad) {
+    public ResponseEntity<Pedido> agregarProducto(@PathVariable Long id, @RequestBody Long idProducto, @RequestParam("cantidad") int cantidad) {
         Pedido pedidoExistente = pedidoService.obtenerPorId(id);
+        if (pedidoExistente == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
         Producto producto = productoService.obtenerPorId(idProducto);
+        if (producto == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
 
         ProductosPedidos productoPedidoExistente = null;
         for (ProductosPedidos bp : pedidoExistente.getProductos()) {
@@ -104,33 +125,37 @@ public class PedidoController {
         }
 
         int nuevaCantidad = cantidad;
-
         if (productoPedidoExistente != null) {
             nuevaCantidad += productoPedidoExistente.getCantidad();
             productoPedidoExistente.setCantidad(nuevaCantidad);
-            pedidoExistente.addProducto(producto, nuevaCantidad);
         } else {
             pedidoExistente.addProducto2(producto, nuevaCantidad);
         }
 
         pedidoExistente.calcularPrecio();
-        pedidoService.insertarPedido(pedidoExistente);
-        return pedidoExistente;
+        Pedido updatedPedido = pedidoService.insertarPedido(pedidoExistente);
+        return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
     }
 
     @GetMapping("/removeProducto/{pedidoId}/{productoId}")
-    public Pedido removeProducto(@PathVariable Long pedidoId, @PathVariable Long productoId) {
+    public ResponseEntity<Pedido> removeProducto(@PathVariable Long pedidoId, @PathVariable Long productoId) {
         Pedido pedido = pedidoService.obtenerPorId(pedidoId);
+        if (pedido == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
         Producto producto = productoService.obtenerPorId(productoId);
+        if (producto == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
 
         pedido.removeProducto(producto);
-        pedidoService.insertarPedido(pedido);
-        return pedido;
+        Pedido updatedPedido = pedidoService.insertarPedido(pedido);
+        return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
     }
 
     @GetMapping("/delete/{id}")
-    public String eliminarPedido(@PathVariable Long id) {
+    public ResponseEntity<String> eliminarPedido(@PathVariable Long id) {
         pedidoService.eliminarPedido(id);
-        return "Pedido eliminado con éxito";
+        return new ResponseEntity<>("Pedido eliminado con éxito", HttpStatus.NO_CONTENT);
     }
 }
