@@ -28,128 +28,120 @@ import com.tamscrap.service.impl.ProductoServiceImpl;
 @CrossOrigin(origins = "http://localhost:4200/")
 public class ProductoController {
 
-    private final ProductoServiceImpl productoService;
-    private static final Logger logger = Logger.getLogger(ProductoController.class.getName());
+	private final ProductoServiceImpl productoService;
+	private static final Logger logger = Logger.getLogger(ProductoController.class.getName());
 
-    public ProductoController(ProductoServiceImpl productoService) {
-        this.productoService = productoService;
-    }
+	public ProductoController(ProductoServiceImpl productoService) {
+		this.productoService = productoService;
+	}
 
-    @PostMapping("/addProducto")
-    public ResponseEntity<ProductoDTO> guardarProducto(@RequestBody ProductoDTO productoDTO) {
-        logger.log(Level.INFO, "Producto recibido: {0}", productoDTO);
-        Producto producto = convertirADto(productoDTO);
-        Producto savedProducto = productoService.insertarProducto(producto);
-        return new ResponseEntity<>(convertirAProductoDTO(savedProducto), HttpStatus.CREATED);
-    }
+	// CREATE
+	@PostMapping("/addProducto")
+	public ResponseEntity<ProductoDTO> guardarProducto(@RequestBody ProductoDTO productoDTO) {
+		logger.log(Level.INFO, "Producto recibido: {0}", productoDTO);
+		Producto producto = convertirADto(productoDTO);
+		Producto savedProducto = productoService.insertarProducto(producto);
+		return new ResponseEntity<>(convertirAProductoDTO(savedProducto), HttpStatus.CREATED);
+	}
 
-    @GetMapping("/listar")
-    public ResponseEntity<List<ProductoDTO>> obtenerTodosLosProductos() {
-        logger.log(Level.INFO, "Obteniendo todos los productos");
-        List<ProductoDTO> productos = productoService.obtenerTodos()
-                .stream()
-                .map(this::convertirAProductoDTO)
-                .collect(Collectors.toList());
-        return new ResponseEntity<>(productos, HttpStatus.OK);
-    }
+	// READ
+	@GetMapping("/listar")
+	public ResponseEntity<List<ProductoDTO>> obtenerTodosLosProductos() {
+		logger.log(Level.INFO, "Obteniendo todos los productos");
+		List<ProductoDTO> productos = productoService.obtenerTodos().stream().map(this::convertirAProductoDTO)
+				.collect(Collectors.toList());
+		return new ResponseEntity<>(productos, HttpStatus.OK);
+	}
 
-    @GetMapping("/ver/{id}")
-    public ResponseEntity<ProductoDTO> obtenerProductoPorId(@PathVariable Long id) {
-        logger.log(Level.INFO, "Obteniendo producto con ID: {0}", id);
-        Producto producto = productoService.obtenerPorId(id);
-        if (producto == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-        return new ResponseEntity<>(convertirAProductoDTO(producto), HttpStatus.OK);
-    }
-    @PutMapping("/editar/{id}")
-    public ResponseEntity<ProductoDTO> editarProducto(@PathVariable Long id, @RequestBody ProductoDTO productoDTO) {
-        Producto productoExistente = productoService.obtenerPorId(id);
-        if (productoExistente == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+	@GetMapping("/ver/{id}")
+	public ResponseEntity<ProductoDTO> obtenerProductoPorId(@PathVariable Long id) {
+		logger.log(Level.INFO, "Obteniendo producto con ID: {0}", id);
+		Producto producto = productoService.obtenerPorId(id);
+		if (producto == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
+		return new ResponseEntity<>(convertirAProductoDTO(producto), HttpStatus.OK);
+	}
 
-        // Update the existing product's details
-        productoExistente.setNombre(productoDTO.getNombre());
-        productoExistente.setPrecio(productoDTO.getPrecio());
-        productoExistente.setImagen(productoDTO.getImagen());
-        productoExistente.setLettering(productoDTO.isLettering());
-        productoExistente.setScrapbooking(productoDTO.isScrapbooking());
+	@GetMapping("/lettering")
+	public ResponseEntity<List<ProductoDTO>> obtenerProductosLettering() {
+		List<ProductoDTO> productos = productoService.ObtenerProductosLettering().stream()
+				.map(this::convertirAProductoDTO).collect(Collectors.toList());
+		return new ResponseEntity<>(productos, HttpStatus.OK);
+	}
 
-        // Update orders
-        Set<ProductosPedidos> nuevosPedidos = productoDTO.getPedidos().stream()
-                .map(dto -> dto.toProductosPedidos(id)) // Pass the current product ID or order ID
-                .collect(Collectors.toSet());
+	@GetMapping("/scrapbooking")
+	public ResponseEntity<List<ProductoDTO>> obtenerProductosScrapbooking() {
+		List<ProductoDTO> productos = productoService.ObtenerProductosScrapbooking().stream()
+				.map(this::convertirAProductoDTO).collect(Collectors.toList());
+		return new ResponseEntity<>(productos, HttpStatus.OK);
+	}
 
-        // Update the existing orders' relationships
-        productoExistente.getPedidos().clear(); // Clear existing relationships
-        for (ProductosPedidos nuevoPedido : nuevosPedidos) {
-            nuevoPedido.setProducto(productoExistente);
-            productoExistente.getPedidos().add(nuevoPedido);
-        }
+	@GetMapping("/ofertas")
+	public ResponseEntity<List<ProductoDTO>> obtenerProductosOferta() {
+		List<ProductoDTO> productos = productoService.ObtenerProductosOferta().stream().map(this::convertirAProductoDTO)
+				.collect(Collectors.toList());
+		return new ResponseEntity<>(productos, HttpStatus.OK);
+	}
 
-        Producto updatedProducto = productoService.insertarProducto(productoExistente);
-        return new ResponseEntity<>(convertirAProductoDTO(updatedProducto), HttpStatus.OK);
-    }
+	// UPDATE
+	@PutMapping("/editar/{id}")
+	public ResponseEntity<ProductoDTO> editarProducto(@PathVariable Long id, @RequestBody ProductoDTO productoDTO) {
+		Producto productoExistente = productoService.obtenerPorId(id);
+		if (productoExistente == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
 
+		// Actualizar detalles del producto existente
+		productoExistente.setNombre(productoDTO.getNombre());
+		productoExistente.setPrecio(productoDTO.getPrecio());
+		productoExistente.setImagen(productoDTO.getImagen());
+		productoExistente.setLettering(productoDTO.isLettering());
+		productoExistente.setScrapbooking(productoDTO.isScrapbooking());
 
-    @DeleteMapping("/borrar/{id}")
-    public ResponseEntity<String> eliminarProducto(@PathVariable Long id) {
-        productoService.eliminarProducto(id);
-        logger.log(Level.INFO, "Producto con ID {0} eliminado", id);
-        return new ResponseEntity<>("Producto eliminado con éxito", HttpStatus.NO_CONTENT);
-    }
+		// Actualizar pedidos
+		Set<ProductosPedidos> nuevosPedidos = productoDTO.getPedidos().stream().map(dto -> dto.toProductosPedidos(id))
+				.collect(Collectors.toSet());
 
-    @GetMapping("/lettering")
-    public ResponseEntity<List<ProductoDTO>> obtenerProductosLettering() {
-        List<ProductoDTO> productos = productoService.ObtenerProductosLettering()
-                .stream()
-                .map(this::convertirAProductoDTO)
-                .collect(Collectors.toList());
-        return new ResponseEntity<>(productos, HttpStatus.OK);
-    }
+		productoExistente.getPedidos().clear();
+		for (ProductosPedidos nuevoPedido : nuevosPedidos) {
+			nuevoPedido.setProducto(productoExistente);
+			productoExistente.getPedidos().add(nuevoPedido);
+		}
 
-    @GetMapping("/scrapbooking")
-    public ResponseEntity<List<ProductoDTO>> obtenerProductosScrapbooking() {
-        List<ProductoDTO> productos = productoService.ObtenerProductosScrapbooking()
-                .stream()
-                .map(this::convertirAProductoDTO)
-                .collect(Collectors.toList());
-        return new ResponseEntity<>(productos, HttpStatus.OK);
-    }
+		Producto updatedProducto = productoService.insertarProducto(productoExistente);
+		return new ResponseEntity<>(convertirAProductoDTO(updatedProducto), HttpStatus.OK);
+	}
 
-    @GetMapping("/ofertas")
-    public ResponseEntity<List<ProductoDTO>> obtenerProductosOferta() {
-        List<ProductoDTO> productos = productoService.ObtenerProductosOferta()
-                .stream()
-                .map(this::convertirAProductoDTO)
-                .collect(Collectors.toList());
-        return new ResponseEntity<>(productos, HttpStatus.OK);
-    }
+	// DELETE
+	@DeleteMapping("/borrar/{id}")
+	public ResponseEntity<String> eliminarProducto(@PathVariable Long id) {
+		productoService.eliminarProducto(id);
+		logger.log(Level.INFO, "Producto con ID {0} eliminado", id);
+		return new ResponseEntity<>("Producto eliminado con éxito", HttpStatus.NO_CONTENT);
+	}
 
-    // Métodos de conversión
-    private ProductoDTO convertirAProductoDTO(Producto producto) {
-        ProductoDTO dto = new ProductoDTO();
-        dto.setId(producto.getId());
-        dto.setNombre(producto.getNombre());
-        dto.setPrecio(producto.getPrecio());
-        dto.setImagen(producto.getImagen());
-        dto.setLettering(producto.isLettering());
-        dto.setScrapbooking(producto.isScrapbooking());
-        dto.setOferta(producto.isOferta());
-        dto.setDescuento(producto.getDescuento());
-//        dto.setPedidos(producto.getPedidos().stream().map(/* lógica de conversión a ProductosPedidosDTO */).collect(Collectors.toSet()));
-        return dto;
-    }
+	// Métodos de conversión
+	private ProductoDTO convertirAProductoDTO(Producto producto) {
+		ProductoDTO dto = new ProductoDTO();
+		dto.setId(producto.getId());
+		dto.setNombre(producto.getNombre());
+		dto.setPrecio(producto.getPrecio());
+		dto.setImagen(producto.getImagen());
+		dto.setLettering(producto.isLettering());
+		dto.setScrapbooking(producto.isScrapbooking());
+		dto.setOferta(producto.isOferta());
+		dto.setDescuento(producto.getDescuento());
+		return dto;
+	}
 
-    private Producto convertirADto(ProductoDTO dto) {
-        Producto producto = new Producto();
-        producto.setNombre(dto.getNombre());
-        producto.setPrecio(dto.getPrecio());
-        producto.setImagen(dto.getImagen());
-        producto.setLettering(dto.isLettering());
-        producto.setScrapbooking(dto.isScrapbooking());
-        // Aquí puedes agregar la lógica para convertir los pedidos si es necesario
-        return producto;
-    }
+	private Producto convertirADto(ProductoDTO dto) {
+		Producto producto = new Producto();
+		producto.setNombre(dto.getNombre());
+		producto.setPrecio(dto.getPrecio());
+		producto.setImagen(dto.getImagen());
+		producto.setLettering(dto.isLettering());
+		producto.setScrapbooking(dto.isScrapbooking());
+		return producto;
+	}
 }

@@ -31,8 +31,8 @@ import com.tamscrap.service.impl.ProductoServiceImpl;
 import jakarta.servlet.http.HttpSession;
 
 @RestController
-@RequestMapping("/carrito/api")
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/carrito")
+@CrossOrigin(origins = "http://localhost:4200/")
 public class CarritoController {
 
 	private final PedidoRepo pedidoRepo;
@@ -56,16 +56,20 @@ public class CarritoController {
 		this.clienteService = clienteService;
 	}
 
+	// READ PRODUCTS IN CART
 	@GetMapping("/productos")
 	public ResponseEntity<List<Producto>> mostrarProductosCarrito() {
+		logger.info("Obteniendo productos en el carrito");
 		List<Long> productIds = Optional.ofNullable((List<Long>) session.getAttribute("carrito_productos"))
 				.orElse(new ArrayList<>());
 		List<Producto> productos = productRepo.findAllById(productIds);
 		return new ResponseEntity<>(productos, HttpStatus.OK);
 	}
 
-	@PostMapping("/add/{id}")
+	// ADD PRODUCT TO CART
+	@PostMapping("/addProducto/{id}")
 	public ResponseEntity<Void> agregarProductoAlCarrito(@PathVariable Long id) {
+		logger.info("Agregando producto al carrito con ID: " + id);
 		List<Long> productIds = Optional.ofNullable((List<Long>) session.getAttribute("carrito_productos"))
 				.orElse(new ArrayList<>());
 
@@ -76,8 +80,10 @@ public class CarritoController {
 		return new ResponseEntity<>(HttpStatus.OK);
 	}
 
-	@DeleteMapping("/remove/{id}")
+	// REMOVE PRODUCT FROM CART
+	@DeleteMapping("/removeProducto/{id}")
 	public ResponseEntity<Void> eliminarProductoDelCarrito(@PathVariable Long id) {
+		logger.info("Eliminando producto del carrito con ID: " + id);
 		List<Long> productIds = Optional.ofNullable((List<Long>) session.getAttribute("carrito_productos"))
 				.orElse(new ArrayList<>());
 
@@ -86,8 +92,10 @@ public class CarritoController {
 		return new ResponseEntity<>(HttpStatus.NO_CONTENT);
 	}
 
+	// CHECKOUT - CREATE ORDER
 	@PostMapping("/checkout")
 	public ResponseEntity<Pedido> procesarPedido(@RequestBody Pedido pedido, @RequestParam List<Long> productoIds) {
+		logger.info("Procesando pedido desde el carrito");
 		if (productoIds != null) {
 			for (Long productoId : productoIds) {
 				Producto producto = productoService.obtenerPorId(productoId);
@@ -103,8 +111,10 @@ public class CarritoController {
 		return new ResponseEntity<>(savedPedido, HttpStatus.CREATED);
 	}
 
+	// CALCULATE TOTAL PRICE OF CART
 	@GetMapping("/checkout/total")
 	public ResponseEntity<Double> calcularTotalCarrito() {
+		logger.info("Calculando el total del carrito");
 		List<Long> productIds = Optional.ofNullable((List<Long>) session.getAttribute("carrito_productos"))
 				.orElse(new ArrayList<>());
 		List<Producto> productos = productRepo.findAllById(productIds);
@@ -112,15 +122,17 @@ public class CarritoController {
 		return new ResponseEntity<>(total, HttpStatus.OK);
 	}
 
+	// CREATE DRAFT ORDER FROM CART
 	@GetMapping("/checkout/detalles")
 	public ResponseEntity<Pedido> crearPedidoDesdeCarrito() {
+		logger.info("Creando pedido desde los detalles del carrito");
 		List<Long> productIds = Optional.ofNullable((List<Long>) session.getAttribute("carrito_productos"))
 				.orElse(new ArrayList<>());
 		List<Producto> productos = productRepo.findAllById(productIds);
-		List<Cliente> clientes = userRepo.findAll();
+		List<Cliente> clientes = userRepo.findAll(); // Se puede utilizar para asociar cliente
 
 		Pedido pedido = new Pedido();
-		pedido.setProductos(new HashSet<>()); // Usamos un Set en lugar de una List
+		pedido.setProductos(new HashSet<>()); // Usamos un Set para los productos
 
 		for (Producto producto : productos) {
 			pedido.addProducto(producto, 1);
@@ -128,5 +140,4 @@ public class CarritoController {
 
 		return new ResponseEntity<>(pedido, HttpStatus.OK);
 	}
-
 }

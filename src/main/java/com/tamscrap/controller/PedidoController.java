@@ -25,137 +25,154 @@ import com.tamscrap.service.impl.PedidoServiceImpl;
 import com.tamscrap.service.impl.ProductoServiceImpl;
 
 @RestController
-@RequestMapping("/pedidos/api")
-@CrossOrigin(origins = "http://localhost:3000")
+@RequestMapping("/api/pedidos")
+@CrossOrigin(origins = "http://localhost:4200/")
 public class PedidoController {
 
-    private final ProductoServiceImpl productoService;
-    private final PedidoServiceImpl pedidoService;
-    private final ClienteServiceImpl clienteService;
-    private static final Logger logger = Logger.getLogger(PedidoController.class.getName());
+	private final ProductoServiceImpl productoService;
+	private final PedidoServiceImpl pedidoService;
+	private final ClienteServiceImpl clienteService;
+	private static final Logger logger = Logger.getLogger(PedidoController.class.getName());
 
-    public PedidoController(ProductoServiceImpl productoService, PedidoServiceImpl pedidoService, ClienteServiceImpl clienteService) {
-        this.productoService = productoService;
-        this.pedidoService = pedidoService;
-        this.clienteService = clienteService;
-    }
+	public PedidoController(ProductoServiceImpl productoService, PedidoServiceImpl pedidoService,
+			ClienteServiceImpl clienteService) {
+		this.productoService = productoService;
+		this.pedidoService = pedidoService;
+		this.clienteService = clienteService;
+	}
 
-    @PostMapping("/pedidos")
-    public ResponseEntity<Pedido> guardarPedido(@RequestBody Pedido pedido) {
-        logger.log(Level.INFO, "Pedido recibido: {0}", pedido);
-        Pedido savedPedido = pedidoService.insertarPedido(pedido);
-        return new ResponseEntity<>(savedPedido, HttpStatus.CREATED);
-    }
+	// CREATE
+	@PostMapping("/addPedido")
+	public ResponseEntity<Pedido> guardarPedido(@RequestBody Pedido pedido) {
+		logger.log(Level.INFO, "Pedido recibido: {0}", pedido);
+		Pedido savedPedido = pedidoService.insertarPedido(pedido);
+		return new ResponseEntity<>(savedPedido, HttpStatus.CREATED);
+	}
 
-    @GetMapping
-    public ResponseEntity<List<Pedido>> mostrarPedidos() {
-        List<Pedido> pedidos = pedidoService.obtenerTodos();
-        return new ResponseEntity<>(pedidos, HttpStatus.OK);
-    }
+	@PostMapping("/add")
+	public ResponseEntity<Pedido> agregarPedido(@RequestBody Pedido pedido, @RequestBody List<Long> productoIds) {
+		logger.log(Level.INFO, "Añadiendo productos al pedido");
+		if (productoIds != null) {
+			for (Long productoId : productoIds) {
+				Producto producto = productoService.obtenerPorId(productoId);
+				if (producto == null) {
+					return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+				}
+				pedido.addProducto(producto, 1);
+			}
+		}
+		pedido.calcularPrecio();
+		Pedido savedPedido = pedidoService.insertarPedido(pedido);
+		return new ResponseEntity<>(savedPedido, HttpStatus.CREATED);
+	}
 
-    @PostMapping("/add")
-    public ResponseEntity<Pedido> agregarPedido(@RequestBody Pedido pedido, @RequestBody List<Long> productoIds) {
-        if (productoIds != null) {
-            for (Long productoId : productoIds) {
-                Producto producto = productoService.obtenerPorId(productoId);
-                if (producto == null) {
-                    return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-                }
-                pedido.addProducto(producto, 1);
-            }
-        }
-        pedido.calcularPrecio();
-        Pedido savedPedido = pedidoService.insertarPedido(pedido);
-        return new ResponseEntity<>(savedPedido, HttpStatus.CREATED);
-    }
+	// READ
+	@GetMapping("/listar")
+	public ResponseEntity<List<Pedido>> mostrarPedidos() {
+		logger.log(Level.INFO, "Obteniendo todos los pedidos");
+		List<Pedido> pedidos = pedidoService.obtenerTodos();
+		return new ResponseEntity<>(pedidos, HttpStatus.OK);
+	}
 
-    @GetMapping("/edit/{id}")
-    public ResponseEntity<Pedido> editarPedido(@PathVariable Long id) {
-        Pedido pedido = pedidoService.obtenerPorId(id);
-        if (pedido == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-        return new ResponseEntity<>(pedido, HttpStatus.OK);
-    }
+	@GetMapping("/ver/{id}")
+	public ResponseEntity<Pedido> editarPedido(@PathVariable Long id) {
+		logger.log(Level.INFO, "Obteniendo pedido con ID: {0}", id);
+		Pedido pedido = pedidoService.obtenerPorId(id);
+		if (pedido == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
+		return new ResponseEntity<>(pedido, HttpStatus.OK);
+	}
 
-    @PostMapping("/edit/{id}")
-    public ResponseEntity<Pedido> actualizarPedido(@PathVariable Long id, @RequestBody Pedido pedido, @RequestBody List<Integer> cantidades) {
-        Pedido pedidoExistente = pedidoService.obtenerPorId(id);
-        if (pedidoExistente == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-        Cliente cliente = clienteService.obtenerPorId(pedido.getCliente().getId());
-        if (cliente == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-        pedidoExistente.setCliente(cliente);
+	// UPDATE
+	@PostMapping("/editar/{id}")
+	public ResponseEntity<Pedido> actualizarPedido(@PathVariable Long id, @RequestBody Pedido pedido,
+			@RequestBody List<Integer> cantidades) {
+		logger.log(Level.INFO, "Actualizando pedido con ID: {0}", id);
+		Pedido pedidoExistente = pedidoService.obtenerPorId(id);
+		if (pedidoExistente == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
+		Cliente cliente = clienteService.obtenerPorId(pedido.getCliente().getId());
+		if (cliente == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
+		pedidoExistente.setCliente(cliente);
 
-        Set<ProductosPedidos> productosPedidos = pedidoExistente.getProductos();
-        ProductosPedidos[] productosArray = productosPedidos.toArray(new ProductosPedidos[0]);
+		Set<ProductosPedidos> productosPedidos = pedidoExistente.getProductos();
+		ProductosPedidos[] productosArray = productosPedidos.toArray(new ProductosPedidos[0]);
 
-        for (int i = 0; i < Math.min(productosArray.length, cantidades.size()); i++) {
-            ProductosPedidos productoPedido = productosArray[i];
-            if (cantidades.get(i) > 0) {
-                productoPedido.setCantidad(cantidades.get(i));
-            } else {
-                pedidoExistente.removeProducto(productoPedido.getProducto());
-            }
-        }
-        Pedido updatedPedido = pedidoService.insertarPedido(pedidoExistente);
-        return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
-    }
+		for (int i = 0; i < Math.min(productosArray.length, cantidades.size()); i++) {
+			ProductosPedidos productoPedido = productosArray[i];
+			if (cantidades.get(i) > 0) {
+				productoPedido.setCantidad(cantidades.get(i));
+			} else {
+				pedidoExistente.removeProducto(productoPedido.getProducto());
+			}
+		}
+		Pedido updatedPedido = pedidoService.insertarPedido(pedidoExistente);
+		return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
+	}
 
-    @PostMapping("/addProducto/{id}")
-    public ResponseEntity<Pedido> agregarProducto(@PathVariable Long id, @RequestBody Long idProducto, @RequestParam("cantidad") int cantidad) {
-        Pedido pedidoExistente = pedidoService.obtenerPorId(id);
-        if (pedidoExistente == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-        Producto producto = productoService.obtenerPorId(idProducto);
-        if (producto == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+	// ADD PRODUCT
+	@PostMapping("/addProducto/{id}")
+	public ResponseEntity<Pedido> agregarProducto(@PathVariable Long id, @RequestBody Long idProducto,
+			@RequestParam("cantidad") int cantidad) {
+		logger.log(Level.INFO, "Agregando producto con ID {0} al pedido con ID {1}", new Object[] { idProducto, id });
+		Pedido pedidoExistente = pedidoService.obtenerPorId(id);
+		if (pedidoExistente == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
+		Producto producto = productoService.obtenerPorId(idProducto);
+		if (producto == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
 
-        ProductosPedidos productoPedidoExistente = null;
-        for (ProductosPedidos bp : pedidoExistente.getProductos()) {
-            if (bp.getProducto().getId().equals(idProducto)) {
-                productoPedidoExistente = bp;
-                break;
-            }
-        }
+		ProductosPedidos productoPedidoExistente = null;
+		for (ProductosPedidos bp : pedidoExistente.getProductos()) {
+			if (bp.getProducto().getId().equals(idProducto)) {
+				productoPedidoExistente = bp;
+				break;
+			}
+		}
 
-        int nuevaCantidad = cantidad;
-        if (productoPedidoExistente != null) {
-            nuevaCantidad += productoPedidoExistente.getCantidad();
-            productoPedidoExistente.setCantidad(nuevaCantidad);
-        } else {
-            pedidoExistente.addProducto2(producto, nuevaCantidad);
-        }
+		int nuevaCantidad = cantidad;
+		if (productoPedidoExistente != null) {
+			nuevaCantidad += productoPedidoExistente.getCantidad();
+			productoPedidoExistente.setCantidad(nuevaCantidad);
+		} else {
+			pedidoExistente.addProducto2(producto, nuevaCantidad);
+		}
 
-        pedidoExistente.calcularPrecio();
-        Pedido updatedPedido = pedidoService.insertarPedido(pedidoExistente);
-        return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
-    }
+		pedidoExistente.calcularPrecio();
+		Pedido updatedPedido = pedidoService.insertarPedido(pedidoExistente);
+		return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
+	}
 
-    @GetMapping("/removeProducto/{pedidoId}/{productoId}")
-    public ResponseEntity<Pedido> removeProducto(@PathVariable Long pedidoId, @PathVariable Long productoId) {
-        Pedido pedido = pedidoService.obtenerPorId(pedidoId);
-        if (pedido == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-        Producto producto = productoService.obtenerPorId(productoId);
-        if (producto == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+	// REMOVE PRODUCT
+	@GetMapping("/removeProducto/{pedidoId}/{productoId}")
+	public ResponseEntity<Pedido> removeProducto(@PathVariable Long pedidoId, @PathVariable Long productoId) {
+		logger.log(Level.INFO, "Eliminando producto con ID {0} del pedido con ID {1}",
+				new Object[] { productoId, pedidoId });
+		Pedido pedido = pedidoService.obtenerPorId(pedidoId);
+		if (pedido == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
+		Producto producto = productoService.obtenerPorId(productoId);
+		if (producto == null) {
+			return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+		}
 
-        pedido.removeProducto(producto);
-        Pedido updatedPedido = pedidoService.insertarPedido(pedido);
-        return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
-    }
+		pedido.removeProducto(producto);
+		Pedido updatedPedido = pedidoService.insertarPedido(pedido);
+		return new ResponseEntity<>(updatedPedido, HttpStatus.OK);
+	}
 
-    @GetMapping("/delete/{id}")
-    public ResponseEntity<String> eliminarPedido(@PathVariable Long id) {
-        pedidoService.eliminarPedido(id);
-        return new ResponseEntity<>("Pedido eliminado con éxito", HttpStatus.NO_CONTENT);
-    }
+	// DELETE
+	@GetMapping("/delete/{id}")
+	public ResponseEntity<String> eliminarPedido(@PathVariable Long id) {
+		logger.log(Level.INFO, "Eliminando pedido con ID: {0}", id);
+		pedidoService.eliminarPedido(id);
+		return new ResponseEntity<>("Pedido eliminado con éxito", HttpStatus.NO_CONTENT);
+	}
 }
